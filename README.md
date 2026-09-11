@@ -6,29 +6,22 @@ A Python simulator produces shipment telemetry, Event Hubs ingests it, an Azure 
 
 ## Architecture
 
-```
-                    ┌──────────────┐   upsert   ┌───────────────┐
-                    │  Cosmos DB    │◄──────────┤               │
-                    │  Shipments    │            │               │
-                    └──────────────┘            │  Function App │
-                                                 │               │
-┌─────────┐   ┌────────────┐   ┌──────────────┐ │ {ProcessTele- │
-│ Producer │──►│ Event Hubs  │──►│ {ProcessTele- │ │   metry}      │
-│ (Python) │   │ telemetry- │   │   metry}      │ └───────┬───────┘
-└─────────┘   │ events      │   │               │         │ ServiceBusMessage
-              └────────────┘   └──────────────┘   (DELAY|DELIVERED only)
-                                                   │
-                                        ┌──────────▼─────────┐
-                                        │ SB Topic           │
-                                        │ shipment-alerts    │
-                                        └─────┬────────┬─────┘
-                               SQL filter 'DELAY'   SQL filter 'DELIVERED'
-                                        │                    │
-                                 ┌──────▼─────┐      ┌───────▼──────┐
-                                 │ Process    │      │ Process      │
-                                 │ Email      │      │ Inventory    │
-                                 │ Alerts     │      │ Updates      │
-                                 └────────────┘      └──────────────┘
+```mermaid
+flowchart LR
+    P["Producer (Python)"] -->|"shipment telemetry"| EH[("Event Hubs\ntelemetry-events")]
+    EH --> F["ProcessTelemetry\n(Azure Function)"]
+    F -->|"upsert"| CDB[("Cosmos DB\nShipments")]
+    F -->|"DELAY | DELIVERED"| SB[("Service Bus Topic\nshipment-alerts")]
+    SB -->|"Type = 'DELAY'"| EA["ProcessEmailAlerts"]
+    SB -->|"Type = 'DELIVERED'"| IU["ProcessInventoryUpdates"]
+
+    style P fill:#e8f0fe
+    style F fill:#e8f0fe
+    style EH fill:#fef7e0
+    style CDB fill:#fef7e0
+    style SB fill:#fef7e0
+    style EA fill:#e6f4ea
+    style IU fill:#e6f4ea
 ```
 
 - **Producer** (`src/EventHubProducer`) — Python script, sends a random shipment payload (Id, Timestamp, coords, `Status` ∈ IN_TRANSIT / DELAY / DELIVERED) to the Event Hub every second.
@@ -42,7 +35,6 @@ infra/                    Bicep for the real stack (RG logistics-eda-rg)
 src/
   EventHubProducer/       Python simulator + uv project
   LogisticsFunctions/     .NET 8 in-process function app (3 functions)
-test/                     Minimal free-stack validation (storage only)
 deploy.sh                 Deploy: infra / app settings / publish
 .github/workflows/deploy.yml   CI/CD (disabled until DEPLOY_ENABLED=true)
 ```
@@ -91,15 +83,6 @@ Local `deploy.sh` is unaffected by `DEPLOY_ENABLED`.
 
 ```bash
 az group delete -n logistics-eda-rg --no-wait -y
-az group delete -n logistics-eda-test-rg --no-wait -y   # test sandbox
-```
-
-## Sandbox / try first
-
-`test/` deploys only a storage account + blob container into `logistics-eda-test-rg` (penny-cost, portal-visible) so you can confirm `az login`, RBAC and the deploy loop before spending anything on the real stack:
-
-```bash
-cd test && ./deploy.sh
 ```
 
 Approximate cost note: the real stack runs on the consumption plan and standard-tier Event Hubs / Service Bus / Cosmos (`infra/infra.bicep`); cheap for a sandbox but not free — tear it down when done.
