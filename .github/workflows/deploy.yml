@@ -1,0 +1,79 @@
+name: Deploy to Azure
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infra/**'
+      - 'src/LogisticsFunctions/**'
+      - 'deploy.sh'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      infra: ${{ steps.filter.outputs.infra }}
+      app: ${{ steps.filter.outputs.app }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            infra:
+              - 'infra/**'
+              - 'deploy.sh'
+            app:
+              - 'src/LogisticsFunctions/**'
+              - 'deploy.sh'
+
+  infra:
+    needs: changes
+    # Kill switch: set the DEPLOY_ENABLED repo variable to 'true' to actually deploy.
+    if: vars.DEPLOY_ENABLED == 'true' && (github.event_name == 'workflow_dispatch' || needs.changes.outputs.infra == 'true')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login via OIDC (no stored secrets)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Validate bicep
+        run: az bicep build --file infra/infra.bicep --outfile "$RUNNER_TEMP/infra.json"
+
+      - name: Deploy infra
+        run: ./deploy.sh --infra
+
+  app:
+    needs: [changes, infra]
+    # Kill switch gated like infra; also blocked if infra failed/cancelled.
+    if: always() && vars.DEPLOY_ENABLED == 'true' && (github.event_name == 'workflow_dispatch' || needs.changes.outputs.app == 'true') && needs.infra.result != 'failure' && needs.infra.result != 'cancelled'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Azure login via OIDC (no stored secrets)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Configure app settings + publish function app
+        run: ./deploy.sh --app

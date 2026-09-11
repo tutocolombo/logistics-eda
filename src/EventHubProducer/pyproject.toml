@@ -1,0 +1,10 @@
+[project]
+name = "eventhub-producer"
+version = "0.1.0"
+requires-python = ">=3.10"
+dependencies = [
+    "azure-eventhub>=5.12.0",
+]
+
+[tool.uv]
+package = false
