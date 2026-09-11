@@ -32,4 +32,3 @@ resource sampleContainer 'Microsoft.Storage/storageAccounts/blobServices/contain
 
 output storageAccountName string = storageAccount.name
 output resourceGroupName string = resourceGroup().name
-output location string = location

@@ -32,9 +32,9 @@ def main():
     )
     try:
         while True:
-            payload = json.dumps(make_shipment()).encode("utf-8")
+            shipment = make_shipment()
+            payload = json.dumps(shipment).encode("utf-8")
             producer.send_batch([EventData(payload)])
-            shipment = json.loads(payload)  # pyright: ignore[reportAny]
             print(f"Sent: {shipment['ShipmentId']} ({shipment['Status']})")
             time.sleep(1)
     except KeyboardInterrupt:

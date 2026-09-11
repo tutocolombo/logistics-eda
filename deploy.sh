@@ -9,7 +9,7 @@
 # Secret-free script. Connection strings are fetched from `az` at deploy time and
 # written straight into the Function App settings - nothing is stored in this repo.
 #
-# Prereqs: az CLI (logged in), dotnet SDK 8+. Live connection strings are printed
+# Prereqs: az CLI (logged in). Live connection strings are printed
 # only on an interactive terminal; otherwise generic instructions are shown.
 
 set -euo pipefail
@@ -63,11 +63,6 @@ az functionapp config appsettings set \
   --name "$FUNC_APP" \
   --settings "EventHubConnection=$EH" "ServiceBusConnection=$SB" "CosmosDBConnection=$COSMOS_CONN" \
   --output none
-
-if [[ "$MODE" == "app" ]]; then
-  echo
-  echo "== App settings configured (--app). Skipping infra deploy. =="
-fi
 
 echo "== Publishing function app (zip deploy) =="
 command -v zip >/dev/null || { echo "error: 'zip' is required"; exit 1; }

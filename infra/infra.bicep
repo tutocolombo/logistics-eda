@@ -8,7 +8,6 @@ resource eventHubNamespace 'Microsoft.EventHub/namespaces@2022-10-01-preview' = 
     tier: 'Standard'
     capacity: 1
   }
-  properties: {}
 }
 
 resource eventHub 'Microsoft.EventHub/namespaces/eventhubs@2022-10-01-preview' = {
@@ -27,19 +26,16 @@ resource serviceBusNamespace 'Microsoft.ServiceBus/namespaces@2022-10-01-preview
     name: 'Standard'
     tier: 'Standard'
   }
-  properties: {}
 }
 
 resource serviceBusTopic 'Microsoft.ServiceBus/namespaces/topics@2022-10-01-preview' = {
   name: 'shipment-alerts'
   parent: serviceBusNamespace
-  properties: {}
 }
 
 resource emailAlertsSubscription 'Microsoft.ServiceBus/namespaces/topics/subscriptions@2022-10-01-preview' = {
   name: 'email-alerts'
   parent: serviceBusTopic
-  properties: {}
 }
 
 resource emailAlertsRule 'Microsoft.ServiceBus/namespaces/topics/subscriptions/rules@2022-10-01-preview' = {
